@@ -14,6 +14,11 @@ class ParrotMenu(QMenu):
 
 		self.addSection("Parrot Companion")
 
+		# Firmware version
+		self.firmware = QAction("Firmware: Unknown", self)
+		self.firmware.setEnabled(False)
+		self.addAction(self.firmware)
+
 		# Battery level
 		icon = QIcon.fromTheme("battery")
 		self.battery = QAction(icon, "Battery: Unknown", self)
@@ -34,12 +39,22 @@ class ParrotTrayIcon(QSystemTrayIcon):
 		self.setContextMenu(self.menu)
 		self.activated.connect(lambda: self.menu.show())
 
+	def attach(self, zik):
+		self.parrot = zik
+		self.parrot.connect()
+		self.menu.actions()[0].setText(zik.friendly_name)
+		self.menu.firmware.setText("Firmware: %s" % (zik.version))
+		self.menu.battery.setText("Battery: %i%%" % (zik.battery))
+
 
 if __name__ == "__main__":
 	app = QApplication(sys.argv)
 	icon = QIcon.fromTheme("audio-headphones")
 	tray = ParrotTrayIcon(icon)
 	tray.show()
+
+	zik = parrot.ParrotZik()
+	tray.attach(zik)
 
 	signal.signal(signal.SIGINT, signal.SIG_DFL)
 	app.exec_()
