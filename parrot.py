@@ -7,6 +7,8 @@ import struct
 from xml.etree import ElementTree
 
 
+BLUEZ_VERSION = 5
+
 class ParrotException(Exception):
 	pass
 
@@ -20,17 +22,28 @@ class Parrot(object):
 
 	def __init__(self):
 		self.bus = dbus.SystemBus()
-		manager = dbus.Interface(self.bus.get_object("org.bluez", "/"), "org.bluez.Manager")
-		adapter_path = manager.DefaultAdapter()
-		self.adapter = dbus.Interface(self.bus.get_object("org.bluez", adapter_path), "org.bluez.Adapter")
 
 	def _get_mac(self):
-		for path in self.adapter.ListDevices():
-			device = dbus.Interface(self.bus.get_object("org.bluez", path), "org.bluez.Device")
-			properties = device.GetProperties()
-			if "Parrot Zik" in properties["Name"]:
-				return properties["Address"]
+		if BLUEZ_VERSION >= 5:
+			manager = dbus.Interface(self.bus.get_object("org.bluez", "/"), "org.freedesktop.DBus.ObjectManager")
+			objects = manager.GetManagedObjects()
+			for path, obj in objects.items():
+				if "org.bluez.Device1" in obj:
+					device = obj["org.bluez.Device1"]
+					if device["Name"]:
+						return device["Address"]
 			raise RuntimeError
+
+		else:
+			manager = dbus.Interface(self.bus.get_object("org.bluez", "/"), "org.bluez.Manager")
+			adapter_path = manager.DefaultAdapter()
+			adapter = dbus.Interface(self.bus.get_object("org.bluez", adapter_path), "org.bluez.Adapter")
+			for path in adapter.ListDevices():
+				device = dbus.Interface(self.bus.get_object("org.bluez", path), "org.bluez.Device")
+				properties = device.GetProperties()
+				if "Parrot Zik" in properties["Name"]:
+					return properties["Address"]
+				raise RuntimeError
 
 	def connect(self):
 		services = bluetooth.find_service(uuid=self.UUID, address=self._get_mac())
